@@ -29,14 +29,14 @@ public class ElasticSearchTest {
     }
 
     public static void main(String[] args) throws IOException {
-        RestHighLevelClient client = ElasticSearchUtil.getHighClient();
+        String indexName = "test1";
+        // 创建连接
+        // ElasticSearchUtil.getHighClient(indexName);
+        // 创建索引
+        ElasticSearchUtil.createIndex(indexName);
 
-        //添加索引
-        CreateIndexRequest request = new CreateIndexRequest("test2");
-        CreateIndexResponse createIndexResponse = client.indices().create(request, RequestOptions.DEFAULT);
-        String index = createIndexResponse.index();
-        System.out.println(index);
-
+        //删除索引
+        //ElasticSearchUtil.deleteIndex(indexName);
     }
 
 }
