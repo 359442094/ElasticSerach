@@ -21,8 +21,10 @@ import org.elasticsearch.client.core.GetSourceResponse;
 import org.elasticsearch.client.indices.*;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.query.MatchAllQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.reindex.DeleteByQueryRequest;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -34,6 +36,7 @@ import org.springframework.util.StringUtils;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -337,11 +340,11 @@ public class ElasticSearchUtil {
      * @param myClass   返回的类型
      * @return List
      */
-    public static List queryDataByIndexName(String indexName, Class myClass) {
+    public static Map<String,Object> queryDataByIndexName(String indexName, Class myClass) {
         if (client == null) {
             init();
         }
-        List results = new ArrayList();
+        Map<String,Object> results = new HashMap<>();
         SearchRequest request = new SearchRequest(indexName);
         SearchResponse response = queryData(request);
         if (response == null) {
@@ -351,8 +354,10 @@ public class ElasticSearchUtil {
         int totalCount = response.getHits().getHits().length;
         if (totalCount > 0) {
             for (SearchHit hit : response.getHits().getHits()) {
+                //包含内容的indexName
+                String index = hit.getIndex();
                 String dataJson = hit.getSourceAsString();
-                results.add(JSONObject.parseObject(dataJson, myClass));
+                results.put(index,JSONObject.parseObject(dataJson, myClass));
             }
         }
         System.out.println("results:" + results);

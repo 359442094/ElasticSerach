@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * <p>
@@ -34,7 +35,7 @@ public class ElasticSearchTest {
     }
 
     public static void main(String[] args) throws IOException {
-        String indexName = "test111";
+        String indexName = "";
         String id = "1234";
         // 创建连接
         ElasticSearchUtil.createConnection();
@@ -53,14 +54,25 @@ public class ElasticSearchTest {
         //ElasticSearchUtil.queryDataById(indexName,id);
 
         //删除索引内容
-        ElasticSearchUtil.deleteDataById(indexName, id);
+        //ElasticSearchUtil.deleteDataById(indexName, id);
+
+        //删除全部索引及内容
+        //ElasticSearchUtil.deleteData();
 
         //普通查询全部索引|指定索引中内容
-        //List<User> list = ElasticSearchUtil.queryDataByIndexName(indexName, User.class);
+        Map<String,Object> map = ElasticSearchUtil.queryDataByIndexName(indexName, User.class);
+        map.entrySet().forEach(entry->{
+            String key = entry.getKey();
+            try {
+                ElasticSearchUtil.deleteIndex(key);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
         //分页查询全部索引|指定索引中内容
-        int pageIndex = 0;
+        /*int pageIndex = 1;
         int pageSize = 5;
-        List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName(indexName, User.class, pageIndex, pageSize);
+        List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName(indexName, User.class, pageIndex, pageSize);*/
 
 
         ElasticSearchUtil.closeConnection();
@@ -74,8 +86,10 @@ public class ElasticSearchTest {
      */
     private static void testSaveOrUpdateData(String indexName, String id) {
         List<User> users = User.users;
-        String jsonString = JSONObject.toJSONString(users.get(0));
-        ElasticSearchUtil.saveOrUpdateIndexAndData(indexName, id, jsonString);
+        for (User user : users) {
+            String jsonString = JSONObject.toJSONString(user);
+            ElasticSearchUtil.saveOrUpdateIndexAndData(indexName, id, jsonString);
+        }
     }
 
 }
