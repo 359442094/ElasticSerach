@@ -12,9 +12,9 @@ import java.util.List;
 @NoArgsConstructor
 public class User {
 
-    private static final List<User> users = new ArrayList<User>() {
+    public static final List<User> users = new ArrayList<User>() {
         {
-            add(new User("陈杰", "男", 20));
+            add(new User("陈杰1", "男", 20));
         }
     };
 
