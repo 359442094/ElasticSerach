@@ -120,9 +120,10 @@ public class ElasticSearchUtil {
             if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
                 String content = EntityUtils.toString(response.getEntity());
                 List<JSONObject> jsonObjects = JSONObject.parseArray(content, JSONObject.class);
-                jsonObjects.stream().forEach(jsonObject -> {
-                    results.add(jsonObject.getString("index"));
-                });
+                if(jsonObjects!=null){
+                    results = jsonObjects.stream().filter(jsonObject -> jsonObject!=null)
+                            .map(jsonObject -> jsonObject.getString("index")).collect(Collectors.toList());
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -530,6 +531,7 @@ public class ElasticSearchUtil {
 
     /**
      * 分词
+     * 需要下载对应elasticSearch版本的ik插件
      * @throws IOException
      */
     public static List<String> getAnalyzeToken(String indexName,String text) throws IOException {

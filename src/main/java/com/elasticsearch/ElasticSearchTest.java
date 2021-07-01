@@ -114,8 +114,9 @@ public class ElasticSearchTest {
 
         //查询全部索引信息
         /*List<String> allIndexData = ElasticSearchUtil.getCatAllIndexData();
-        System.out.println("size:"+allIndexData.size());
-        allIndexData.stream().forEach(index->{
+        System.out.println("allIndexData:"+allIndexData);
+        System.out.println("size:"+allIndexData.size());*/
+        /*allIndexData.stream().forEach(index->{
             System.out.println(index);
             //删除索引
             try {
@@ -134,15 +135,15 @@ public class ElasticSearchTest {
         //删除全部索引及内容
         //ElasticSearchUtil.deleteData();
 
-        //普通查询全部索引|指定索引中内容
+        //普通查询全部索引内容不为空索引|指定索引中内容
         //Map<String,Object> map = ElasticSearchUtil.queryDataByIndexName("", User.class);
 
         //分页查询全部索引|指定索引中内容
         /*int pageIndex = -1;
         int pageSize = 3;
         List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName("", User.class, pageIndex, pageSize);
-*/
-        queryData();
+        */
+        //queryData();
 
         //查询分词效果
         //ElasticSearchUtil.getAnalyzeToken("user-cj55","中华人民共和国国歌");
