@@ -11,6 +11,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.ElasticsearchStatusException;
 import org.elasticsearch.action.DocWriteResponse;
+import org.elasticsearch.action.admin.indices.analyze.AnalyzeRequestBuilder;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -185,9 +186,9 @@ public class ElasticSearchUtil {
             CreateIndexResponse createIndexResponse = client.indices().create(request, RequestOptions.DEFAULT);
             boolean result = createIndexResponse != null && !StringUtils.isEmpty(createIndexResponse.index());
             if (result) {
-                log.info("索引{}删除成功", indexName);
+                log.info("索引{}创建成功", indexName);
             } else {
-                log.error("索引{}删除失败", indexName);
+                log.error("索引{}创建失败", indexName);
             }
             return result;
         } catch (ElasticsearchStatusException e) {
@@ -314,9 +315,12 @@ public class ElasticSearchUtil {
                 log.error("索引:{}不存在",indexName);
                 return false;
             }
+            //修改之后原索引内容不会被覆盖、这里需要删除原索引
+            deleteIndex(indexName);
+
             UpdateRequest request = new UpdateRequest().index(indexName).id(id).doc(sourceJson,XContentType.JSON);
             UpdateResponse response = client.update(request, RequestOptions.DEFAULT);
-            return response.getResult() == DocWriteResponse.Result.UPDATED;
+            return response.getResult() == DocWriteResponse.Result.UPDATED || response.getResult() == DocWriteResponse.Result.CREATED ;
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -348,8 +352,8 @@ public class ElasticSearchUtil {
         if (client == null) {
             init();
         }
-        if (StringUtils.isEmpty(indexName) || StringUtils.isEmpty(id)) {
-            log.error("index:{}内容创建失败:参数id或indexName缺失", indexName);
+        if (StringUtils.isEmpty(indexName) ) {
+            log.error("index:{}内容创建失败:参数indexName缺失", indexName);
             return false;
         }
         try {
@@ -425,6 +429,10 @@ public class ElasticSearchUtil {
             searchSourceBuilder.from(from);
             //查询多少条
             searchSourceBuilder.size(max);
+
+            //获取记录总数
+            searchSourceBuilder.trackTotalHits(true);
+
             System.out.println("this:"+from+"-"+max);
             //排序
             //searchSourceBuilder.sort();
@@ -501,10 +509,16 @@ public class ElasticSearchUtil {
         }
 
         //总记录数
-        int totalCount = response.getHits().getHits().length;
-        //log.info("总记录数:"+response.getHits().getTotalHits().value);
+        int totalCount = Integer.valueOf(response.getHits().getTotalHits().value+"");
+        //当前页记录数
+        int thisPageTotalCount = response.getHits().getHits().length;
+        //当前页数
+        int pageCount = totalCount % pageSize == 0 ? totalCount / pageSize : totalCount / pageSize + 1 ;
         log.info("总记录数:"+totalCount);
-        if (totalCount > 0) {
+        log.info("总页数:"+pageCount);
+        log.info("当前页记录数:"+thisPageTotalCount);
+        log.info("当前页数:"+pageIndex);
+        if (thisPageTotalCount > 0) {
             for (SearchHit hit : response.getHits().getHits()) {
                 String dataJson = hit.getSourceAsString();
                 results.add(JSONObject.parseObject(dataJson, myClass));
@@ -512,6 +526,21 @@ public class ElasticSearchUtil {
         }
         System.out.println("results:" + results);
         return results;
+    }
+
+    public static void testAnalyze() throws IOException {
+        //中国是个伟大的发展中国家
+        /**
+         * analyze=ik_max_word 最细分
+         * analyze-ik_smart 最小分
+         * analyze:standard || ik_max_word
+         * */
+        AnalyzeRequest analyzeRequest = AnalyzeRequest.withIndexAnalyzer("user-cj55", "ik_max_word", "中华人民共和国国歌");
+        AnalyzeResponse response = client.indices().analyze(analyzeRequest, RequestOptions.DEFAULT);
+        List<AnalyzeResponse.AnalyzeToken> tokens = response.getTokens();
+        for (AnalyzeResponse.AnalyzeToken token : tokens) {
+            System.out.println(token.getTerm());
+        }
     }
 
 }

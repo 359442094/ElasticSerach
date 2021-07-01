@@ -5,11 +5,18 @@ import com.elasticsearch.model.BatchRequest;
 import com.elasticsearch.model.User;
 import com.elasticsearch.util.ElasticSearchUtil;
 import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
-import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.query.*;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
+import org.elasticsearch.search.aggregations.metrics.AvgAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 
 import java.io.IOException;
@@ -30,11 +37,63 @@ public class ElasticSearchTest {
 
     private static final List<User> users = User.users;
 
-    private void queryData() {
+    private static void queryData() {
         SearchRequest searchRequest = new SearchRequest();
+        // 设置查询类型:QUERY_THEN_FETCH DFS_QUERY_THEN_FETCH DEFAULT
+        searchRequest.searchType(SearchType.DEFAULT);
+
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        //查询全部
+        //searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        //&&查询
+        //searchSourceBuilder.query(QueryBuilders.termQuery("name","22"));
+        /*
+        searchSourceBuilder.query(QueryBuilders.queryStringQuery("name:22"));
+        searchSourceBuilder.query(QueryBuilders.queryStringQuery("userId:123421"));
+        */
+        //组合查询
+        /**
+         * must 相当于 与 & =
+         *
+         * must not 相当于 非 ~   ！=
+         *
+         * should 相当于 或  |   or
+         *
+         * filter  过滤
+         * */
+        /*searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .should(QueryBuilders.wildcardQuery("name","*"+"cj"+"*"))
+                .should(QueryBuilders.termQuery("name","22"))
+                //过滤之后只显示符合最后一项内容
+                .filter(QueryBuilders.termQuery("name","22"))
+        );*/
+        //模糊查询
+        //searchSourceBuilder.query(QueryBuilders.wildcardQuery("name","*"+"cj"+"*"));
+
+        //最大值查询
+        //searchSourceBuilder.aggregation(AggregationBuilders.max("maxAge").field("age"));
+
+       //分组查询
+        // searchSourceBuilder.aggregation(AggregationBuilders.terms("ageGroup").field("age"));
+
+        //分词查询
+        /**
+         * .analyzer("ik_smart")
+         *     .operator(Operator.OR)
+         * */
+        searchSourceBuilder.query(
+                QueryBuilders.boolQuery()
+                        .should(QueryBuilders.prefixQuery("message","中国"))
+
+        );
+
+
         searchRequest.source(searchSourceBuilder);
+        SearchResponse response = ElasticSearchUtil.queryData(searchRequest);
+        for (SearchHit hit : response.getHits().getHits()) {
+            System.out.println(hit.getIndex());
+            System.out.println(hit.getSourceAsString());
+        }
     }
 
     public static void main(String[] args) throws IOException {
@@ -86,10 +145,14 @@ public class ElasticSearchTest {
         //Map<String,Object> map = ElasticSearchUtil.queryDataByIndexName("", User.class);
 
         //分页查询全部索引|指定索引中内容
-        /*int pageIndex = 2;
+        /*int pageIndex = -1;
         int pageSize = 3;
         List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName("", User.class, pageIndex, pageSize);
-        */
+*/
+        //queryData();
+
+        //添加分词内容
+        ElasticSearchUtil.testAnalyze();
 
         ElasticSearchUtil.closeConnection();
     }
