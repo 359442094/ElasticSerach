@@ -67,26 +67,19 @@ public class ElasticSearchTest {
                 //过滤之后只显示符合最后一项内容
                 .filter(QueryBuilders.termQuery("name","22"))
         );*/
+        //in查询
+        /*searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .should(QueryBuilders.queryStringQuery("name:22"))
+                .should(QueryBuilders.queryStringQuery("name:user-cj55"))
+        );*/
         //模糊查询
         //searchSourceBuilder.query(QueryBuilders.wildcardQuery("name","*"+"cj"+"*"));
 
         //最大值查询
         //searchSourceBuilder.aggregation(AggregationBuilders.max("maxAge").field("age"));
 
-       //分组查询
+        //分组查询
         // searchSourceBuilder.aggregation(AggregationBuilders.terms("ageGroup").field("age"));
-
-        //分词查询
-        /**
-         * .analyzer("ik_smart")
-         *     .operator(Operator.OR)
-         * */
-        searchSourceBuilder.query(
-                QueryBuilders.boolQuery()
-                        .should(QueryBuilders.prefixQuery("message","中国"))
-
-        );
-
 
         searchRequest.source(searchSourceBuilder);
         SearchResponse response = ElasticSearchUtil.queryData(searchRequest);
@@ -149,10 +142,10 @@ public class ElasticSearchTest {
         int pageSize = 3;
         List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName("", User.class, pageIndex, pageSize);
 */
-        //queryData();
+        queryData();
 
-        //添加分词内容
-        ElasticSearchUtil.getAnalyzeToken("user-cj55","中华人民共和国国歌");
+        //查询分词效果
+        //ElasticSearchUtil.getAnalyzeToken("user-cj55","中华人民共和国国歌");
 
         ElasticSearchUtil.closeConnection();
     }
