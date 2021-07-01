@@ -1,10 +1,19 @@
 package com.elasticsearch.util;
 
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.elasticsearch.model.BatchRequest;
 import lombok.extern.slf4j.Slf4j;
+import net.minidev.json.JSONUtil;
 import org.apache.http.HttpHost;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.HttpClient;
+import org.apache.http.util.EntityUtils;
 import org.elasticsearch.ElasticsearchStatusException;
+import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -15,6 +24,8 @@ import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.*;
 import org.elasticsearch.client.core.GetSourceRequest;
 import org.elasticsearch.client.core.GetSourceResponse;
@@ -30,15 +41,14 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.elasticsearch.search.sort.SortOrder;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -88,6 +98,38 @@ public class ElasticSearchUtil {
     }
 
     /**
+     * 发送es请求
+     * @param url
+     * @return
+     * @throws IOException
+     */
+    public static Response sendEsConnection(String url) throws IOException {
+        Request request = new Request(HttpMethod.GET.toString(), url);
+        return client.getLowLevelClient().performRequest(request);
+    }
+
+    /**
+     * 获取全部索引名称
+     * @return
+     */
+    public static List<String> getCatAllIndexData(){
+        List<String> results = new ArrayList<>();
+        try {
+            Response response = sendEsConnection("/_cat/indices?format=json");
+            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                String content = EntityUtils.toString(response.getEntity());
+                List<JSONObject> jsonObjects = JSONObject.parseArray(content, JSONObject.class);
+                jsonObjects.stream().forEach(jsonObject -> {
+                    results.add(jsonObject.getString("index"));
+                });
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return results;
+    }
+
+    /**
      * 关闭连接
      *
      * @throws IOException
@@ -112,9 +154,8 @@ public class ElasticSearchUtil {
         try {
             GetIndexRequest request = new GetIndexRequest(indexName);
             getIndexResponse = client.indices().get(request, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            log.info("索引[" + indexName + "]不存在");
-            e.printStackTrace();
+        } catch (Exception e) {
+            log.error("索引[" + indexName + "]不存在:{}",e.getMessage());
             return null;
         }
         Map<String, Settings> settingsMap = getIndexResponse.getSettings();
@@ -193,14 +234,14 @@ public class ElasticSearchUtil {
     }
 
     /**
-     * 创建或者修改索引内容
+     * 创建索引及内容
      *
      * @param indexName
      * @param id
      * @param sourceJson
      * @return
      */
-    public static boolean saveOrUpdateIndexAndData(String indexName, String id, String sourceJson) {
+    public static boolean saveIndexAndData(String indexName, String id, String sourceJson) {
         if (client == null) {
             init();
         }
@@ -215,18 +256,85 @@ public class ElasticSearchUtil {
             request.source(sourceJson, XContentType.JSON);
             response = client.index(request, RequestOptions.DEFAULT);
             boolean resultFlag = response != null && response.getResult() != null
-                    && "CREATED".equals(response.getResult().toString())
-                    || "UPDATED".equals(response.getResult().toString());
+                    && "CREATED".equals(response.getResult().toString());
             if (resultFlag) {
-                log.info("index:{}内容创建|修改成功,id:{}", indexName, id);
+                log.info("index:{}内容创建成功,id:{}", indexName, id);
             } else {
-                log.error("index:{}内容创建|修改失败,id:{}", indexName, id);
+                log.error("index:{}内容创建失败,id:{}", indexName, id);
             }
             return resultFlag;
         } catch (IOException e) {
             e.printStackTrace();
         }
         return false;
+    }
+
+    /**
+     * 批量创建索引及内容
+     *
+     * @throws IOException
+     */
+    public static boolean batchSaveIndexAndData(List<BatchRequest> requests) {
+        if (requests == null || requests != null && requests.size()<=0) {
+            log.error("request参数缺失");
+            return false;
+        }
+        BulkRequest bulkRequest = new BulkRequest();
+        requests.stream().filter(request->request!=null).forEach(request->{
+            bulkRequest.add(new IndexRequest().index(request.getIndexName()).id(request.getId()).source(request.getSource(), XContentType.JSON));
+        });
+        BulkResponse responses = batch(bulkRequest);
+        boolean resultFlag = responses != null && responses.getItems() != null && responses.getItems().length == requests.size();
+        if (resultFlag) {
+            log.info("内容批量创建成功");
+        } else {
+            log.error("内容批量创建失败");
+        }
+        return resultFlag;
+    }
+
+    /**
+     * 修改索引及内容
+     * @param indexName
+     * @param id
+     * @param sourceJson
+     * @return
+     */
+    public static boolean updateIndexAndData(String indexName, String id, String sourceJson){
+        if(client == null){
+            init();
+        }
+        if(StringUtils.isEmpty(indexName)||StringUtils.isEmpty(id)||StringUtils.isEmpty(sourceJson)){
+            log.error("index:{}内容修改失败:参数indexName,id或sourceJson缺失", indexName);
+            return false;
+        }
+        try {
+            GetIndexResponse indexResponse = getIndex(indexName);
+            if(indexResponse == null){
+                log.error("索引:{}不存在",indexName);
+                return false;
+            }
+            UpdateRequest request = new UpdateRequest().index(indexName).id(id).doc(sourceJson,XContentType.JSON);
+            UpdateResponse response = client.update(request, RequestOptions.DEFAULT);
+            return response.getResult() == DocWriteResponse.Result.UPDATED;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * 批量操作
+     * @param request
+     * @return
+     */
+    public static BulkResponse batch(BulkRequest request){
+        try {
+            return client.bulk(request, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**
@@ -312,16 +420,12 @@ public class ElasticSearchUtil {
             SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
             searchSourceBuilder.query(QueryBuilders.matchAllQuery());
             // 从第几条开始
-            int from;
-            if (pageIndex <= 1) {
-                from = 0;
-            } else {
-                from = pageIndex;
-            }
-            from = (from * pageSize);
+            int from = pageIndex <= 1 ? 0 : pageIndex * pageSize - pageSize;
+            int max = (pageIndex <= 0 ? 1 * pageSize : pageIndex * pageSize);
             searchSourceBuilder.from(from);
             //查询多少条
-            searchSourceBuilder.size(pageSize);
+            searchSourceBuilder.size(max);
+            System.out.println("this:"+from+"-"+max);
             //排序
             //searchSourceBuilder.sort();
             request.source(searchSourceBuilder);
@@ -341,14 +445,20 @@ public class ElasticSearchUtil {
      * @return List
      */
     public static Map<String,Object> queryDataByIndexName(String indexName, Class myClass) {
+        Map<String,Object> resultMap = new HashMap<>();
+        if(!StringUtils.isEmpty(indexName)){
+            GetIndexResponse indexResponse = getIndex(indexName);
+            if(indexResponse == null){
+                return resultMap;
+            }
+        }
         if (client == null) {
             init();
         }
-        Map<String,Object> results = new HashMap<>();
         SearchRequest request = new SearchRequest(indexName);
         SearchResponse response = queryData(request);
-        if (response == null) {
-            return null;
+        if (response == null || response.status() == RestStatus.NOT_FOUND) {
+            return resultMap;
         }
         //总记录数
         int totalCount = response.getHits().getHits().length;
@@ -357,11 +467,11 @@ public class ElasticSearchUtil {
                 //包含内容的indexName
                 String index = hit.getIndex();
                 String dataJson = hit.getSourceAsString();
-                results.put(index,JSONObject.parseObject(dataJson, myClass));
+                resultMap.put(index,JSONObject.parseObject(dataJson, myClass));
             }
         }
-        System.out.println("results:" + results);
-        return results;
+        System.out.println("resultMap:" + resultMap.size());
+        return resultMap;
     }
 
     /**
@@ -373,15 +483,23 @@ public class ElasticSearchUtil {
      * @return
      */
     public static List queryPageDataByIndexName(String indexName, Class myClass,Integer pageIndex, Integer pageSize) {
+        List results = new ArrayList();
+        if(!StringUtils.isEmpty(indexName)){
+            GetIndexResponse indexResponse = getIndex(indexName);
+            if(indexResponse == null){
+                return results;
+            }
+        }
         if (client == null) {
             init();
         }
-        List results = new ArrayList();
         SearchRequest request = new SearchRequest(indexName);
         SearchResponse response = queryPageData(request,pageIndex,pageSize);
-        if (response == null) {
-            return null;
+        if (response == null || response.status() == RestStatus.NOT_FOUND) {
+            log.error("索引不存在");
+            return results;
         }
+
         //总记录数
         int totalCount = response.getHits().getHits().length;
         //log.info("总记录数:"+response.getHits().getTotalHits().value);

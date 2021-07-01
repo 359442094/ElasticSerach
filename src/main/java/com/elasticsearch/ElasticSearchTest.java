@@ -1,6 +1,7 @@
 package com.elasticsearch;
 
 import com.alibaba.fastjson.JSONObject;
+import com.elasticsearch.model.BatchRequest;
 import com.elasticsearch.model.User;
 import com.elasticsearch.util.ElasticSearchUtil;
 import org.elasticsearch.action.search.SearchRequest;
@@ -27,6 +28,8 @@ import java.util.Map;
  */
 public class ElasticSearchTest {
 
+    private static final List<User> users = User.users;
+
     private void queryData() {
         SearchRequest searchRequest = new SearchRequest();
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
@@ -35,8 +38,8 @@ public class ElasticSearchTest {
     }
 
     public static void main(String[] args) throws IOException {
-        String indexName = "";
-        String id = "1234";
+        String indexName = "user-cj1234";
+        String id = "userId-12341";
         // 创建连接
         ElasticSearchUtil.createConnection();
 
@@ -47,8 +50,28 @@ public class ElasticSearchTest {
         //删除索引
         //ElasticSearchUtil.deleteIndex(indexName);
 
-        //创建或者修改索引内容
-        //testSaveOrUpdateData(indexName,id);
+        //创建索引内容
+        //testSaveData(indexName,id);
+
+        //批量创建索引内容
+        //testBatchSaveIndexAndData();
+
+        //修改索引及内容
+        /*boolean data = ElasticSearchUtil.updateIndexAndData(indexName, id, JSONObject.toJSONString(users.get(1)));
+        System.out.println(data);*/
+
+        //查询全部索引信息
+        /*List<String> allIndexData = ElasticSearchUtil.getCatAllIndexData();
+        System.out.println("size:"+allIndexData.size());
+        allIndexData.stream().forEach(index->{
+            System.out.println(index);
+            //删除索引
+            try {
+                ElasticSearchUtil.deleteIndex(index);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });*/
 
         //根据编号进行查询
         //ElasticSearchUtil.queryDataById(indexName,id);
@@ -60,36 +83,39 @@ public class ElasticSearchTest {
         //ElasticSearchUtil.deleteData();
 
         //普通查询全部索引|指定索引中内容
-        Map<String,Object> map = ElasticSearchUtil.queryDataByIndexName(indexName, User.class);
-        map.entrySet().forEach(entry->{
-            String key = entry.getKey();
-            try {
-                ElasticSearchUtil.deleteIndex(key);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-        //分页查询全部索引|指定索引中内容
-        /*int pageIndex = 1;
-        int pageSize = 5;
-        List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName(indexName, User.class, pageIndex, pageSize);*/
+        //Map<String,Object> map = ElasticSearchUtil.queryDataByIndexName("", User.class);
 
+        //分页查询全部索引|指定索引中内容
+        /*int pageIndex = 2;
+        int pageSize = 3;
+        List<User> pageList = ElasticSearchUtil.queryPageDataByIndexName("", User.class, pageIndex, pageSize);
+        */
 
         ElasticSearchUtil.closeConnection();
     }
 
     /**
-     * 创建或者修改索引内容
+     * 测试创建索引内容
      *
      * @param indexName
      * @param id
      */
-    private static void testSaveOrUpdateData(String indexName, String id) {
-        List<User> users = User.users;
+    private static void testSaveData(String indexName, String id) {
         for (User user : users) {
             String jsonString = JSONObject.toJSONString(user);
-            ElasticSearchUtil.saveOrUpdateIndexAndData(indexName, id, jsonString);
+            ElasticSearchUtil.saveIndexAndData(indexName, id, jsonString);
         }
+    }
+
+    /**
+     * 测试批量创建索引内容
+     */
+    private static void  testBatchSaveIndexAndData(){
+        List<BatchRequest> requests = new ArrayList<>();
+        users.stream().forEach(user -> {
+            requests.add(new BatchRequest("user-"+user.getName(),"userId-"+user.getUserId(),JSONObject.toJSONString(user)));
+        });
+        ElasticSearchUtil.batchSaveIndexAndData(requests);
     }
 
 }
