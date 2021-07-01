@@ -152,7 +152,7 @@ public class ElasticSearchTest {
         //queryData();
 
         //添加分词内容
-        ElasticSearchUtil.testAnalyze();
+        ElasticSearchUtil.getAnalyzeToken("user-cj55","中华人民共和国国歌");
 
         ElasticSearchUtil.closeConnection();
     }

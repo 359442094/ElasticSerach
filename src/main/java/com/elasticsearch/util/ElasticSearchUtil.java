@@ -528,19 +528,27 @@ public class ElasticSearchUtil {
         return results;
     }
 
-    public static void testAnalyze() throws IOException {
+    /**
+     * 分词
+     * @throws IOException
+     */
+    public static List<String> getAnalyzeToken(String indexName,String text) throws IOException {
         //中国是个伟大的发展中国家
         /**
          * analyze=ik_max_word 最细分
          * analyze-ik_smart 最小分
          * analyze:standard || ik_max_word
          * */
-        AnalyzeRequest analyzeRequest = AnalyzeRequest.withIndexAnalyzer("user-cj55", "ik_max_word", "中华人民共和国国歌");
+        if(getIndex(indexName) == null){
+            return new ArrayList<>();
+        }
+        AnalyzeRequest analyzeRequest = AnalyzeRequest.withIndexAnalyzer(indexName, "ik_max_word", text);
         AnalyzeResponse response = client.indices().analyze(analyzeRequest, RequestOptions.DEFAULT);
         List<AnalyzeResponse.AnalyzeToken> tokens = response.getTokens();
-        for (AnalyzeResponse.AnalyzeToken token : tokens) {
+        tokens.stream().forEach(token -> {
             System.out.println(token.getTerm());
-        }
+        });
+        return tokens.stream().map(AnalyzeResponse.AnalyzeToken::getTerm).collect(Collectors.toList());
     }
 
 }
